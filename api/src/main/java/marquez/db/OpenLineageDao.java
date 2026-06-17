@@ -576,7 +576,7 @@ public interface OpenLineageDao extends BaseDao {
                     location,
                     null,
                     jobDao.toJson(toDatasetId(inputs), mapper),
-                    parent.getCurrentRunUuid().orElse(null)))
+                    runUuid))
         .orElseGet(
             () ->
                 jobDao.upsertJob(
