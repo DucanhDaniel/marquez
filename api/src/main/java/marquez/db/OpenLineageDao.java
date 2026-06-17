@@ -378,7 +378,8 @@ public interface OpenLineageDao extends BaseDao {
         insertDatasetFacets(daos, dataset, record, runUuid, event.getEventType(), now);
         insertInputDatasetFacets(daos, dataset, record, runUuid, event.getEventType(), now);
       }
-    } else if (!event.isTerminalEventForStreamingJobWithNoDatasets()) {
+    } else if (!event.isTerminalEventForStreamingJobWithNoDatasets() &&
+               (event.getEventType() != null && event.getEventType().equalsIgnoreCase("COMPLETE"))) {
       // mark job_versions_io_mapping as obsolete
       daos.getJobVersionDao().markInputOrOutputDatasetAsPreviousFor(job.getUuid(), IoType.INPUT);
     }
@@ -394,7 +395,8 @@ public interface OpenLineageDao extends BaseDao {
         insertDatasetFacets(daos, dataset, record, runUuid, event.getEventType(), now);
         insertOutputDatasetFacets(daos, dataset, record, runUuid, event.getEventType(), now);
       }
-    } else if (!event.isTerminalEventForStreamingJobWithNoDatasets()) {
+    } else if (!event.isTerminalEventForStreamingJobWithNoDatasets() &&
+               (event.getEventType() != null && event.getEventType().equalsIgnoreCase("COMPLETE"))) {
       // mark job_versions_io_mapping as obsolete
       daos.getJobVersionDao().markInputOrOutputDatasetAsPreviousFor(job.getUuid(), IoType.OUTPUT);
     }
@@ -761,12 +763,17 @@ public interface OpenLineageDao extends BaseDao {
     final JobVersionDao jobVersionDao = createJobVersionDao();
     // Link the job version to the job only if the run is marked done and has transitioned into one
     // of the following states: COMPLETED, ABORTED, or FAILED.
-    final boolean linkJobToJobVersion = runState.isDone();
+    JobVersionDao.JobRowRunDetails details = jobVersionDao.loadJobRowRunDetails(
+        updateLineageRow.getJob(), updateLineageRow.getRun().getUuid());
+
+    // Only update the job's current version if it COMPLETED, or if we actually recorded datasets.
+    // If it FAILED and recorded 0 datasets, we DO NOT want to wipe out the Job's current version!
+    final boolean linkJobToJobVersion = runState == RunState.COMPLETED || 
+        !details.jobVersionInputs().isEmpty() || !details.jobVersionOutputs().isEmpty();
 
     BagOfJobVersionInfo bagOfJobVersionInfo =
         jobVersionDao.upsertJobVersionOnRunTransition(
-            jobVersionDao.loadJobRowRunDetails(
-                updateLineageRow.getJob(), updateLineageRow.getRun().getUuid()),
+            details,
             runState,
             event.getEventTime().toInstant(),
             linkJobToJobVersion);
