@@ -138,7 +138,7 @@ public interface DatasetDao extends BaseDao {
                 FROM datasets_view
                 WHERE namespace_name = :namespaceName
                 ORDER BY name
-                LIMIT 10
+                LIMIT :limit
                 OFFSET :offset))
       SELECT d.*,
           dv.fields,
